@@ -624,15 +624,26 @@ public class HashMap<K,V> extends AbstractMap<K,V>
     final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
                    boolean evict) {
         Node<K,V>[] tab; Node<K,V> p; int n, i;
+        // 步骤1：tab为空则创建
+        // table 未初始化或者长度为0，进行扩容 resize()
         if ((tab = table) == null || (n = tab.length) == 0)
             n = (tab = resize()).length;
+        // 步骤2：计算index，并对 null 进行处理
+        // (n - 1) & hash 确定元素存放在哪个桶中，桶为空，新生成节点放入桶中（此时，这个节点是放在数组中）
         if ((p = tab[i = (n - 1) & hash]) == null)
             tab[i] = newNode(hash, key, value, null);
+        // 桶中已经存在元素
         else {
             Node<K,V> e; K k;
+            // 步骤3：节点 key 存在，直接覆盖 value
+            // 比较桶中第一个元素（数组中的节点）的 hash 值相当，key 相等
             if (p.hash == hash &&
                 ((k = p.key) == key || (key != null && key.equals(k))))
+                // 将第一个元素赋给e，用e来记录
                 e = p;
+            // 步骤4：判断该链为红黑树
+            // hash 值不相等，即key不相等；为红黑树节点
+            // 放入当前元素类型为 TreeNode,表示红黑树节点，putTreeVal返回待存放的 node，e可能为null
             else if (p instanceof TreeNode)
                 e = ((TreeNode<K,V>)p).putTreeVal(this, tab, hash, key, value);
             else {
