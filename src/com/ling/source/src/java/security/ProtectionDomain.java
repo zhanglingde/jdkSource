@@ -466,11 +466,6 @@ public class ProtectionDomain {
                         }
                     };
                 }
-                // 抽象方法实现
-                @Override
-                public boolean getStaticPermissionsField(ProtectionDomain protectionDomain) {
-                    return false;
-                }
             });
     }
 }
