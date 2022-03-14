@@ -643,34 +643,54 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                 e = p;
             // 步骤4：判断该链为红黑树
             // hash 值不相等，即key不相等；为红黑树节点
-            // 放入当前元素类型为 TreeNode,表示红黑树节点，putTreeVal返回待存放的 node，e可能为null
+            // 放入当前元素类型为 TreeNode,表示红黑树节点，putTreeVal返回待存放的 node，e 可能为 null
             else if (p instanceof TreeNode)
                 e = ((TreeNode<K,V>)p).putTreeVal(this, tab, hash, key, value);
+            // 5. 该链为链表
             else {
+                // 在链表最末插入结点
                 for (int binCount = 0; ; ++binCount) {
+                    // 到达链表底部
+
+                    // 判断该链表尾部指针是否为空
                     if ((e = p.next) == null) {
+                        // 在链表尾部插入新节点
                         p.next = newNode(hash, key, value, null);
+                        // 判断链表长度是否达到转换红黑树的临界值，默认为 8
                         if (binCount >= TREEIFY_THRESHOLD - 1) // -1 for 1st
+                            // 链表结构转树型结构
                             treeifyBin(tab, hash);
                         break;
                     }
+                    // 判断链表中节点的 key 值与插入的元素的 key 值是否相等
                     if (e.hash == hash &&
                         ((k = e.key) == key || (key != null && key.equals(k))))
+                        // 相等，跳出循环
                         break;
+                    // 用于遍历桶中的链表，与前面的 e = p.next 组合，可以遍历链表
                     p = e;
                 }
             }
+            // 判断当前 key 已经存在的情况下，再来一个相同的 hash 值、key 值时，返回新来的 value 值
             if (e != null) { // existing mapping for key
+                // 记录 e 的 value
                 V oldValue = e.value;
+                // onlyIfAbsent 为 false 或 旧值为 null
                 if (!onlyIfAbsent || oldValue == null)
+                    // 用新值替换旧值
                     e.value = value;
+                // 访问后回调
                 afterNodeAccess(e);
+                // 返回旧值
                 return oldValue;
             }
         }
+        // 结构性修改
         ++modCount;
+        // 6. 超过最大容量，扩容（实际大小大于阈值，扩容）
         if (++size > threshold)
             resize();
+        // 插入后回调
         afterNodeInsertion(evict);
         return null;
     }
@@ -685,64 +705,92 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * @return the table
      */
     final Node<K,V>[] resize() {
+        // oldTab 指向 hash 桶数组
         Node<K,V>[] oldTab = table;
         int oldCap = (oldTab == null) ? 0 : oldTab.length;
         int oldThr = threshold;
         int newCap, newThr = 0;
+        // oldCap 不为空，就是 hash 桶数组不为空
         if (oldCap > 0) {
+            // 如果大于最大容量了，就赋值为整数的最大的值
             if (oldCap >= MAXIMUM_CAPACITY) {
                 threshold = Integer.MAX_VALUE;
                 return oldTab;
             }
+            // 如果当前 hash 桶数组的长度在扩容后仍然小于最大容量，并且 oldCap 大于默认值 16
             else if ((newCap = oldCap << 1) < MAXIMUM_CAPACITY &&
                      oldCap >= DEFAULT_INITIAL_CAPACITY)
-                newThr = oldThr << 1; // double threshold
+                newThr = oldThr << 1; // double threshold  双倍扩容阈值
         }
+        // 旧的容量为 0，但 threshold 大于零，代表有参构造有 cap 传入，threadshold 已经被初始化成最小 2 的 n 次幂
         else if (oldThr > 0) // initial capacity was placed in threshold
+            // 直接将该值赋给新的变量
             newCap = oldThr;
+        // 无参构造创建的 map，给出默认容量 16 和 threshold 16 * 0.75 = 12
         else {               // zero initial threshold signifies using defaults
             newCap = DEFAULT_INITIAL_CAPACITY;
             newThr = (int)(DEFAULT_LOAD_FACTOR * DEFAULT_INITIAL_CAPACITY);
         }
+        // 新的 threshold = 新的 cap * 0.75
         if (newThr == 0) {
             float ft = (float)newCap * loadFactor;
             newThr = (newCap < MAXIMUM_CAPACITY && ft < (float)MAXIMUM_CAPACITY ?
                       (int)ft : Integer.MAX_VALUE);
         }
         threshold = newThr;
+        // 计算出新的数组长度后赋给当前成员变量 table
         @SuppressWarnings({"rawtypes","unchecked"})
-            Node<K,V>[] newTab = (Node<K,V>[])new Node[newCap];
+            Node<K,V>[] newTab = (Node<K,V>[])new Node[newCap];    // 新建 hash 桶数组
+        // 将新数组的值复制给旧的 hash 桶数组
         table = newTab;
+        // 如果原先的数组没有初始化，那么 resize 的初始化工作到此结束；否则进入扩容元素重排逻辑，使其均匀的分散
         if (oldTab != null) {
+            // 遍历新数组的所有桶下标
             for (int j = 0; j < oldCap; ++j) {
                 Node<K,V> e;
                 if ((e = oldTab[j]) != null) {
+                    // 旧数组的桶下标赋值给临时变量 e，并且解除旧数组中的引用，否则旧数组无法被 GC 回收
                     oldTab[j] = null;
+                    // 如果 e.next == null ，代表桶中就一个元素，不存在链表或红黑树
                     if (e.next == null)
+                        // 用同样的 hash 映射算法把该元素加入新的数组
                         newTab[e.hash & (newCap - 1)] = e;
+                    // 如果 e 是 TreeNode 并且 e.next != null,那么处理树中元素的重排
                     else if (e instanceof TreeNode)
                         ((TreeNode<K,V>)e).split(this, newTab, j, oldCap);
+                    // e 是链表的头并且 e.next != null ,么处理链表中元素重排
                     else { // preserve order
+                        // loHead,loTail 代表扩容后不用变换下标
                         Node<K,V> loHead = null, loTail = null;
+                        // hiHead,hiTail 代表扩容后变换下标
                         Node<K,V> hiHead = null, hiTail = null;
                         Node<K,V> next;
+                        // 遍历链表
                         do {
                             next = e.next;
                             if ((e.hash & oldCap) == 0) {
                                 if (loTail == null)
+                                    // 初始化 head 指向链表当前元素 e，e 不一定是链表的第一个元素，初始化后 loHead 代表下标保持不变的链表的头元素
                                     loHead = e;
                                 else
+                                    // loTail.next 指向当前 e
                                     loTail.next = e;
+                                // loTail 指向当前元素 e
+                                // 初始化后，loTail 和 loHead 指向相同的内存，所以当 loTail.next 指向下一个元素时
+                                // 底层数组中的元素的 next 引用也发生相应变化，造成 loHead.next.next ...
+                                // 跟随 loTail 同步，使得 loHead 可以链接到所有属于该链表的元素
                                 loTail = e;
                             }
                             else {
                                 if (hiTail == null)
+                                    // 初始化 head 指向链表当前元素 e，初始化后 hiHead 代表下标更改的链表头元素
                                     hiHead = e;
                                 else
                                     hiTail.next = e;
                                 hiTail = e;
                             }
                         } while ((e = next) != null);
+                        // 遍历结束，将 tail 指向 null，并把链表头放入新数组的相应下标，形成新的映射
                         if (loTail != null) {
                             loTail.next = null;
                             newTab[j] = loHead;
